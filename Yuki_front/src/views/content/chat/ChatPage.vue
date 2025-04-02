@@ -20,6 +20,7 @@
           <span class="history-list-title">
           {{ item.title }}
           </span>
+          <input v-if="isInputTitle === index" v-model = InputTitleValue class="inputTitle"></input>
           <el-icon @click.stop="editItem(index)" class="history-list-icon history-list-edit"><Edit /></el-icon>
           <el-icon @click.stop="deleteItem(index)" class="history-list-icon history-list-delete"><Delete /></el-icon>
         </li>
@@ -109,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { Link, Microphone } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 // import AudioBase from "@/components/AudioBase.vue";
@@ -120,7 +121,6 @@ import { useApiConfigStore } from "@/stores/apiConfig";
 import ConfTask from "@/views/content/components/ConfTask.vue"
 
 const apiConfigStore = useApiConfigStore();
-
 const historyList = ref([
   {
     title: "直接使用大模型",
@@ -181,12 +181,19 @@ const handleFileUpload = (event) => {
   console.log("选择的文件：", file);
 }
 
+
+const isInputTitle = ref(null);
+const InputTitleValue = ref("");
+const editIndex = null;
+
 const editItem = (index) => {
-  console.log("编辑项:", index);
+  isInputTitle.value = index;
+  editIndex = index;
+  InputTitleValue.value = historyList.value[index].title;
 }
 
 const deleteItem = (index) => {
-  console.log("删除项:", index);
+  historyList.value.splice(index, 1);
   currentConversationIndex.value = 0;
 }
 
@@ -259,9 +266,32 @@ const scrollToBottom = () => {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 };
 
-onMounted(() => {});
+function handleClickOutside(event) {
+  const selectListLeftElements = document.querySelectorAll(".inputTitle");
+  let clickedInside = false;
 
-onUnmounted(() => {
+  selectListLeftElements.forEach((element) => {
+    if (element.contains(event.target)) {
+      clickedInside = true;
+    }
+  });
+
+  if (!clickedInside) {
+    console.log(editIndex);
+    if (editIndex !== null){
+      historyList.value[editIndex].title = InputTitleValue.value;
+      editIndex = null;
+    }
+    isInputTitle.value = null;
+  }
+}
+
+onMounted(() => {
+  document.addEventListener("click", handleClickOutside);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", handleClickOutside);
 });
 </script>
 
@@ -349,6 +379,20 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.inputTitle{
+  background-color: rgba(255, 255, 255);
+  font-size: 13px;
+  text-align: left;
+  position: fixed;
+  padding: 0;
+  padding-left: 5px;
+  text-indent: 0;
+  height: 20px;
+  width: 175px;
+  transform: translateX(-5px);
+  z-index: 100;
 }
 
 .history-list-icon{
