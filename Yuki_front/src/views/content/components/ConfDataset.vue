@@ -8,7 +8,8 @@
     </div>
     <div class="info-body">
       <div v-for="dataset in datasets" :key="dataset.name" :title="dataset.description" class="dataset-card">
-        {{ dataset.name }}
+        <span class="dataset-name">{{ dataset.name }}</span>
+        <el-icon @click="deleteDataset(dataset.name)" class="delete-dataset"><Delete/></el-icon>
         <div class="bubbles">
           <div v-for="n in getRandomBubbleCount()" :key="n" class="bubble" :style="getBubbleStyle()"></div>
         </div>
@@ -23,19 +24,40 @@
   </div>
   <div v-if="showUploadDataset"  class="backdrop"></div>
   <div v-if="showUploadDataset" class="pop-window">
-      <UploadDataset @emitClosePopWindow="closePopWindow" />
+      <UploadDataset @emitClosePopWindow="closePopWindow" @emitRefreshDatasets="reflushDatasets" />
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import UploadDataset from './UploadDataset.vue';
+import { ElMessage } from "element-plus";
+import { API, BASE_URL } from '@/api/config';
+import $ from 'jquery';
 
 // 数据集示例
-let datasets = ref([
-  { name: 'RSITMD', description: 'RSITMD数据集' },
-  { name: 'RSICD', description: 'RSICD数据集' }
-]);
+let datasets = ref([]);
+
+const reflushDatasets = () => { 
+  datasets.value = [];
+  $.ajax({
+    url: BASE_URL + API.DATASETS,
+    type: 'GET',
+    dataType: 'json',
+    success: function (data) {
+      data.forEach((d) => {
+        datasets.value.push({
+          name: d.name,
+          description: d.description,
+        });
+      })
+    },
+  })};
+
+onMounted(() => {
+  reflushDatasets();
+})
+
 let showUploadDataset = ref(false);
 
 function openPopWindow() {
@@ -44,6 +66,37 @@ function openPopWindow() {
 
 function closePopWindow(value) {
   showUploadDataset.value = value;
+}
+
+function deleteDataset(datasetName) {
+  console.log(datasetName);
+  fetch(BASE_URL + API.DATASETS, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ name: datasetName })
+  })
+  .then(res => {
+    if (res.ok){
+      return res.json();
+    }
+    else{
+      throw new Error("网络异常")
+    }
+  })
+  .then(data => {
+    if (data.code === 200) {
+      ElMessage.success("数据集删除成功！");
+      reflushDatasets();
+    } else if (data.code === 400) {
+      ElMessage.error(data.error || "数据集不存在");
+    } else if (data.code === 500) {
+      ElMessage.error(data.error || "服务器错误，请稍后重试"); 
+    } else {
+      ElMessage.error(data.error || "删除失败，请稍后重试");
+    }
+  })
 }
 
 // 随机气泡数量
@@ -141,15 +194,43 @@ function getBubbleStyle() {
   margin: 20px;
   border-radius: 10px;
   position: relative;
-  overflow: hidden;
   box-sizing: border-box;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 20px;
-  color: #66b2ff;
   cursor: pointer;
 }
+
+.dataset-name {
+  font-size: 20px;
+  color: #66b2ff;
+  overflow: hidden;
+}
+
+.delete-dataset{
+  color: red;
+  position: absolute;
+  font-size: 30px;
+  top: 50%;
+  left: 50%;
+  z-index: 100;
+  opacity: 0;
+  transform: translateX(-50%) translateY(-50%);
+}
+
+.dataset-card:hover {
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.dataset-card:hover .dataset-name {
+  opacity: 0;
+}
+
+.dataset-card:hover .delete-dataset{
+  opacity: 1;
+  transition: all 0.3s;
+}
+
 
 /* 气泡动画 */
 .bubbles {
@@ -212,9 +293,6 @@ function getBubbleStyle() {
   color: #66b2ff;
 }
 
-.dataset-card:hover {
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-}
 
 .backdrop {
   position: fixed;

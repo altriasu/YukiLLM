@@ -22,7 +22,7 @@
           </span>
           <input v-if="isInputTitle === index" v-model = InputTitleValue class="inputTitle"></input>
           <el-icon @click.stop="editItem(index)" class="history-list-icon history-list-edit"><Edit /></el-icon>
-          <el-icon @click.stop="deleteItem(index)" class="history-list-icon history-list-delete"><Delete /></el-icon>
+          <el-icon v-show="chatCount > 1" @click.stop="deleteItem(index)" class="history-list-icon history-list-delete"><Delete /></el-icon>
         </li>
       </ul>
     </div>
@@ -141,6 +141,7 @@ const chatMessagesRef = ref(null);
 const isInputDisabled = ref(false);
 const isTxt2ImgRetrieve = ref(false);
 const isShowConfTask = ref(false);
+let chatCount = ref(1)
 
 const openPopWindow = () => {
   isShowConfTask.value = true;
@@ -168,6 +169,7 @@ const createNewConversation = (value) => {
     ],
   });
   currentConversationIndex.value = 0;
+  chatCount.value = chatCount.value + 1;
 }
 
 const fileInput = ref(null)
@@ -184,7 +186,8 @@ const handleFileUpload = (event) => {
 
 const isInputTitle = ref(null);
 const InputTitleValue = ref("");
-const editIndex = null;
+let editIndex = null;
+
 
 const editItem = (index) => {
   isInputTitle.value = index;
@@ -195,6 +198,7 @@ const editItem = (index) => {
 const deleteItem = (index) => {
   historyList.value.splice(index, 1);
   currentConversationIndex.value = 0;
+  chatCount.value = chatCount.value - 1;
 }
 
 const currentConversation = computed(
@@ -277,7 +281,6 @@ function handleClickOutside(event) {
   });
 
   if (!clickedInside) {
-    console.log(editIndex);
     if (editIndex !== null){
       historyList.value[editIndex].title = InputTitleValue.value;
       editIndex = null;

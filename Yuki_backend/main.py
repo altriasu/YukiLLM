@@ -9,7 +9,7 @@ from datasetsApi.datasets_api import datasets_api
 from chat.chat_api import chat_api
 
 
-app = FastAPI()
+app = FastAPI(max_upload_size = 1024 * 1024 * 1024 * 10) # 100MB
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,9 +21,9 @@ app.add_middleware(
 
 @app.middleware("http")
 async def myMiddleware(request: Request, call_next):
-    print("收到请求")
+    # print("收到请求")
     response = await call_next(request)
-    print("发送回复")
+    # print("发送回复")
     return response
 
 

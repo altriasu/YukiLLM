@@ -1,3 +1,3 @@
 STATIC_DIR = "./static/"
-HOST = "127.0.0.1"
-PORT = 8001
+HOST = "0.0.0.0"
+PORT = 3389

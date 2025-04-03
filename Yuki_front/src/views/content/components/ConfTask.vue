@@ -254,6 +254,7 @@ onBeforeUnmount(() => {
     /* background-color: green; */
     color: #66b2ff;
     text-align: center;
+    font-size: 1.1em;
     height: 100%;
     flex: 1;
     box-shadow: inset 0px 2px 5px rgba(0, 0, 0, 0.2);
