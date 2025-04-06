@@ -46,9 +46,10 @@
               </div>
             </div>
             <div class="content">
-              {{ message.content }}
-              <!--              <audio v-if="message.audioUrl" :src="message.audioUrl" controls></audio>-->
-              <!-- <AudioBase></AudioBase> -->
+              <div v-html="message.content" class="message-text"></div>
+              <div class="image-container">
+                <img v-for="(img, index) in message.images" :key="index" :src="img" class="streamed-img"/>
+              </div>
             </div>
           </div>
         </div>
@@ -113,9 +114,8 @@
 import { ref, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { Link, Microphone } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
-// import AudioBase from "@/components/AudioBase.vue";
 import { get, post } from "@/utils/request";
-import { API } from "@/api/config";
+import { BASE_URL, API } from "@/api/config";
 
 import { useApiConfigStore } from "@/stores/apiConfig";
 import ConfTask from "@/views/content/components/ConfTask.vue"
@@ -134,6 +134,7 @@ const historyList = ref([
   },
 ]);
 
+// <---------------------------------- 弹窗 -------------------------------------------->
 const currentConversationIndex = ref(0);
 const userInput = ref("");
 const isListening = ref(false);
@@ -155,6 +156,7 @@ const newConversation = () => {
   openPopWindow();
 };
 
+// <---------------------------------- 新建任务 ------------------------------------------->
 const createNewConversation = (value) => {
   closePopWindow();
   historyList.value.unshift({
@@ -171,18 +173,6 @@ const createNewConversation = (value) => {
   currentConversationIndex.value = 0;
   chatCount.value = chatCount.value + 1;
 }
-
-const fileInput = ref(null)
-
-const triggerFileInput = () => {
-  fileInput.value.click()
-}
-
-const handleFileUpload = (event) => {
-  const file = event.target.files[0];
-  console.log("选择的文件：", file);
-}
-
 
 const isInputTitle = ref(null);
 const InputTitleValue = ref("");
@@ -212,6 +202,35 @@ const selectConversation = (index) => {
   });
 };
 
+
+// <---------------------------------- 发送信息 ------------------------------------------->
+const fileInput = ref(null);
+let uploadFile = null;
+
+const triggerFileInput = () => {
+  fileInput.value.click()
+}
+
+const handleFileUpload = (event) => {
+  uploadFile = event.target.files[0];
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function typeWriter(text, targetRef, delay = 10) {
+  for (let char of text) {
+    await sleep(delay);
+    if (char === '\n') {
+      targetRef.content += '<br/>';  // 支持换行
+    } else {
+      targetRef.content += char;
+    }
+  }
+}
+
+
 const sendMessage = async () => {
   if (userInput.value.trim()) {
     // 添加用户消息
@@ -225,45 +244,70 @@ const sendMessage = async () => {
       scrollToBottom();
     });
 
+    const formdata = new FormData();
+    formdata.append("dataset_name", "RSITMD");
+    formdata.append("task_id", "jiujiu");
+    formdata.append("retrieve_type", "img2txt");
+    formdata.append("file", uploadFile)
+
     const loadingMessage = ref({
       role: "assistant",
-      content: "神奇海螺正在思考...",
+      content: "检索开始...<br>",
       loading: true, // 标记为加载状态
+      images: []
     });
+
+    fetch(BASE_URL + API.REMOTECLIP, {
+      method: 'POST',
+      body: formdata
+    })
+    .then(response => {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      function read() {
+        reader.read().then(async ({ done, value }) => {
+          if (done) return;
+
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop();
+
+          for (const part of parts) {
+            try {
+              const msg = JSON.parse(part);
+
+              if (msg.type === "progress") {
+                await typeWriter(`检索中...${msg.data}`, loadingMessage.value);
+              } else if (msg.type === "hint") {
+                await typeWriter(msg.data, loadingMessage.value);
+              } else if (msg.type === "result_img") {
+                loadingMessage.value.images.push(msg.data);
+              } else if (msg.type === "result_txt") {
+                await typeWriter(msg.data, loadingMessage.value);
+              } else if (msg.type === "error") {
+                loadingMessage.value.content = "检索失败，请稍后重试";
+              }
+            } catch (e) {
+              console.error("JSON parse error", e);
+            }
+          }
+
+          read();
+        });
+      }
+
+      read();
+    });
+
     currentConversation.value.messages.push(loadingMessage.value);
     nextTick(() => {
       scrollToBottom();
     });
-
-    // 获取AI回复
-    try {
-      const res = await get(API.GENERATE, { prompt: prompt });
-      if (res.code == 100) {
-        // 更新加载中的消息为实际回复
-        loadingMessage.value.content = res.data;
-        loadingMessage.value.loading = false; // 更新为非加载状态
-        nextTick(() => {
-          scrollToBottom();
-        });
-      } else {
-        ElMessage.error(res.msg);
-        loadingMessage.value.content = "获取回复失败，请稍后重试";
-        loadingMessage.value.loading = false;
-        nextTick(() => {
-          scrollToBottom();
-        });
-      }
-    } catch (error) {
-      console.error("sendMessage error", error);
-      ElMessage.error("获取回复失败，请稍后重试");
-      loadingMessage.value.content = "获取回复失败，请稍后重试";
-      loadingMessage.value.loading = false;
-      nextTick(() => {
-        scrollToBottom();
-      });
-    }
   }
 };
+
 
 const scrollToBottom = () => {
   const chatMessages = chatMessagesRef.value;
@@ -305,6 +349,21 @@ onBeforeUnmount(() => {
   height: 100vh;
   font-family: Arial, sans-serif;
 }
+
+.image-container {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.streamed-img {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
 
 .history-panel {
   width: 280px;

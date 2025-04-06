@@ -33,5 +33,6 @@
 
 # backend
 */static
-*/__pycache__
-*/*/__pychache__
+**/__pycache__/
+**/cache/
+**/clip_checkpoints/

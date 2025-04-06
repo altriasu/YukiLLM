@@ -1,334 +1,321 @@
 <template>
   <div class="login-page">
-    <div class="background">
-      <div class="glow"></div>
-    </div>
-    <div class="bubbles">
-      <div class="bubble" v-for="n in 15" :key="n"></div>
-    </div>
-    <div class="content">
-      <div class="center-content">
-        <h1>为什么不问问神奇海螺呢？</h1>
-        <p>- 关于蟹堡王和汉堡制作的一切知识 -</p>
-        <button class="magic-button" @click="goToMainPage">
-          <span>召唤神奇海螺</span>
-        </button>
+    <div v-show="!showOpVideo" class="wave-container">
+      <div class="wave-box" ref="waveRefs">
+        <div class="wave-box-title">
+          <div>YUKILLM</div>
+          <div>This is a platform </div>
+          <div>for remote sensing image retrieval using large models</div>
+          <div>Welcome to our platform</div>
+        </div>
+        <svg class="waves" viewBox="0 12 150 28" preserveAspectRatio="none" shape-rendering="auto">
+          <defs>
+            <path id="gentle-wave" d="M-160 44c30 0 58-18 88-18s58 18 88 18 58-18 88-18 58 18 88 18v44h-352z"></path>
+          </defs>
+          <g class="parallax">
+            <use xlink:href="#gentle-wave" x="20" y="2" fill="rgba(0, 122, 204, 0.7)" />
+            <use xlink:href="#gentle-wave" x="40" y="3" fill="rgba(0, 122, 204, 0.5)" />
+            <use xlink:href="#gentle-wave" x="80" y="4" fill="rgba(0, 122, 204, 0.3)" />
+            <use xlink:href="#gentle-wave" x="100" y="5" fill="rgba(0, 122, 204, 0.9)" />
+          </g>
+        </svg>
+        <div class="wave-bottom"></div>
       </div>
     </div>
+    <video v-show="showOpVideo" ref="videoRef" class="op-video" autoplay muted @ended="onOpVideoEnded">
+      <source src="@/assets/video/op.mp4" type="video/mp4" />
+      您的浏览器不支持 HTML5 视频。
+    </video>
+    <!-- 初始不渲染背景视频，直到OP视频播放结束 -->
+    <video v-show="showBgVideo" ref="videoRef2" class="background-video" autoplay muted loop>
+      <source src="@/assets/video/bg.mp4" type="video/mp4" />
+      您的浏览器不支持 HTML5 视频。
+    </video>
+    <button v-if="showButton" @click="goToMainPage()" ref="magicButtonRef" class="magic-button">
+      <div class="logo">YUKI</div>
+      <div class="text">click to start your experience</div>
+    </button>
   </div>
 </template>
 
-<script setup lang="ts">
-import { useRouter } from 'vue-router';
+<script setup>
+import { ref, onMounted, nextTick } from 'vue';
 
-const router = useRouter();
+const waveRefs = ref(null);
+
+const videoRef = ref(null);
+const videoRef2 = ref(null);
+const showOpVideo = ref(false);
+const showBgVideo = ref(false);
+const showButton = ref(false);
+const magicButtonRef = ref(null);
+
+
+function generateFadeDownKeyframes() {
+  let keyframes = '@keyframes fadeDown {\n';
+
+  for (let i = 0; i <= 33; i += 3) {
+    const h = 100 - i;
+    keyframes += `  ${i}% { height: ${h}%; }\n`;
+  }
+
+  for (let i = 33; i <= 50; i += 2) {
+    const h = 100 - i;
+    keyframes += `  ${i}% { height: ${h}%; }\n`;
+  }
+
+  for (let i = 51; i <= 100; i ++) {
+    const h = 100 - i;
+    keyframes += `  ${i}% { height: ${h}%; }\n`;
+  }
+
+  keyframes += '}\n';
+
+  // 创建 <style> 标签并插入
+  const styleTag = document.createElement('style');
+  styleTag.type = 'text/css';
+  styleTag.innerHTML = keyframes;
+  document.head.appendChild(styleTag);
+}
+
+
+onMounted(() => {
+  generateFadeDownKeyframes();
+
+  const opVideo = videoRef.value;
+  const bgVideo = videoRef2.value;
+
+  if (opVideo && bgVideo) {
+    // 提前加载 OP 视频，进行缓冲
+    opVideo.load();
+    opVideo.play().then(() => {
+      opVideo.pause(); // 播放一次然后暂停，确保预加载完成
+      opVideo.currentTime = 0.7; 
+    })
+    // 播放 wave 动画
+    waveRefs.value?.classList.add('down');
+    
+    waveRefs.value?.addEventListener('animationend', () => {
+      nextTick(() => {
+        showOpVideo.value = true;
+        // 直接继续播放已缓冲的 op
+        opVideo.play()
+        setTimeout(() => {
+          showButton.value = true;
+          nextTick(() => {
+            magicButtonRef.value?.classList.add('show');
+          });
+        }, 1100);
+      });
+    });
+
+    bgVideo.load();
+  }
+});
 
 const goToMainPage = () => {
-  router.push('/main');
+  window.location.href = '/main';
+};
+
+
+const onOpVideoEnded = () => {
+  showBgVideo.value = true;
+  videoRef2.value?.play(); 
+  videoRef.value?.remove();
 };
 </script>
 
 <style scoped>
+*{
+  margin: 0;
+  padding: 0;
+}
 .login-page {
   position: relative;
   height: 100vh;
   overflow: hidden;
-  background: url('@/assets/images/backGround.jpg') no-repeat center center;
-  background-size: cover; /* 这将确保图片覆盖整个区域且不变形 */
 }
 
-.background {
+.wave-container {
+  position: relative;
+  background-color: #181a1b;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.wave-box {
   position: absolute;
-  top: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.9;
+}
+
+@font-face {
+  font-family: 'Playfair';
+  src: url('@/assets/fonts/PlayfairDisplaySC/PlayfairDisplaySC-Regular.ttf') format('truetype');
+}
+
+.wave-box-title {
+  position: fixed;
+  top: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  font-size: 20px;
+  text-align: center;
+}
+
+.wave-box div:nth-child(1){
+  font-size: 1.9em;
+  font-family: 'Playfair', sans-serif;
+  color: #1d384a;
+}
+
+.wave-box div:nth-child(2){
+  font-size: 0.4em;
+  font-family: 'times new roman', sans-serif;
+  color: #98b7ca;
+}
+
+.wave-box div:nth-child(3){
+  font-size: 0.4em;
+  font-family: 'times new roman', sans-serif;
+  color: #98b7ca;
+}
+
+.wave-box div:nth-child(4){
+  font-size: 0.4em;
+  font-family: 'times new roman', sans-serif;
+  color: #98b7ca;
+}
+
+
+.wave-box.down {
+  animation: fadeDown 2s ease-in-out forwards;
+}
+
+.waves {
+  width: 100%;
+  height: 15vh;
+  transform: translateY(-15vh);
+  margin-bottom: -8px;
+}
+
+.wave-bottom {
+  position: absolute;
+  bottom: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 0;
-  background: rgba(10, 25, 47, 0.7); /* 添加半透明遮罩，使背景不那么刺眼 */
+  background-color: #007acc;
 }
 
-.glow {
+
+.parallax use {
+  animation: move-forever 1s cubic-bezier(0.55, 0.5, 0.45, 0.5) infinite;
+}
+
+.parallax use:nth-child(1){
+  animation-delay: -2s;
+  animation-duration: 4s;
+}
+
+.parallax use:nth-child(2){
+  animation-delay: -3s;
+  animation-duration: 6s;
+}
+
+.parallax use:nth-child(3){
+  animation-delay: -5s;
+  animation-duration: 8s;
+}
+
+.parallax use:nth-child(4){
+  animation-delay: -7s;
+  animation-duration: 12s;
+}
+
+@keyframes move-forever {
+  0% {
+    transform: translate3d(-90px, 0, 0);
+  }
+  100% {
+    transform: translate3d(85px, 0, 0);
+  }
+}
+
+.op-video {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(29, 78, 216, 0.15) 0%,
-    transparent 70%
-  );
-  filter: blur(60px);
-  opacity: 0.8;
-  animation: pulse 10s ease-in-out infinite alternate;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 0.5;
+.background-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+}
+
+.magic-button {
+  all: unset;
+  position: absolute;
+  top: 50%;
+  left: 63%;
+  transform: translateY(-50%);
+  width: 300px;
+  height: 150px;
+  background-color: rgba(0, 0, 0, 0);
+  border-radius: 10px;
+  font-size: 28px;
+  font-family: 'times new roman', sans-serif;
+  color: white;
+  cursor: pointer;
+  opacity: 0; 
+}
+
+.magic-button.show{
+  animation: fadeIn 0.5s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.2;
   }
   50% {
+    opacity: 0.5;
+  }
+  70% {
+    opacity: 0.7;
+  }
+  100% {
     opacity: 1;
   }
 }
 
-.content {
-  position: relative;
-  display: flex;
-  height: 100%;
-  z-index: 1;
-  justify-content: center; /* 水平居中 */
-  align-items: center; /* 垂直居中 */
+.logo {
+  text-align: center;
+  font-size: 80px;
+  transform: translate(-5px, 20%);
+  font-weight: bold;
 }
 
-.center-content {
+.text { 
   text-align: center;
+  font-size: 0.5em;
+  font-family: 'microsoft yahei', sans-serif;
+  font-weight: bold;
   color: white;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-h1 {
-  font-size: 4em;
-  margin-bottom: 20px;
-  letter-spacing: 2px;
-  text-shadow: 0 0 10px rgba(65, 184, 255, 0.7);
-  animation: glow 3s ease-in-out infinite alternate;
-  margin-left: 0;
-  margin-right: 0;
-}
-
-@keyframes glow {
-  from {
-    text-shadow: 0 0 10px rgba(65, 184, 255, 0.7);
-  }
-  to {
-    text-shadow: 0 0 20px rgba(65, 184, 255, 0.9), 0 0 30px rgba(65, 184, 255, 0.7);
-  }
-}
-
-p {
-  font-size: 1.4em;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.8);
-  text-shadow: 0 0 5px rgba(65, 184, 255, 0.5);
-  margin: 0;
-}
-
-.magic-button {
-  margin-top: 40px;
-  padding: 15px 30px;
-  font-size: 1.2em;
-  color: #fff;
-  background: linear-gradient(90deg, #00d2ff, #3a7bd5, #00d2ff);
-  background-size: 200% 100%;
-  border: none;
-  border-radius: 25px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);
-}
-
-.magic-button::before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  background: linear-gradient(45deg, #00d2ff, #3a7bd5, #2ecc71, #00d2ff);
-  background-size: 400% 400%;
-  z-index: -1;
-  animation: glowing 3s ease-in-out infinite;
-  border-radius: 25px;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.magic-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 20px rgba(0, 210, 255, 0.5);
-}
-
-.magic-button:hover::before {
-  opacity: 1;
-}
-
-.magic-button:hover {
-  background-position: 100% 0;
-}
-
-.magic-button:active {
-  transform: translateY(1px);
-}
-
-@keyframes glowing {
-  0% {
-    background-position: 0 0;
-  }
-  50% {
-    background-position: 400% 0;
-  }
-  100% {
-    background-position: 0 0;
-  }
-}
-
-.bubbles {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  overflow: hidden;
-  top: 0;
-  left: 0;
-}
-
-.bubble {
-  position: absolute;
-  bottom: -100px;
-  width: 40px;
-  height: 40px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  opacity: 0.5;
-  animation: rise 10s infinite ease-in;
-}
-
-.bubble:nth-child(1) {
-  width: 40px;
-  height: 40px;
-  left: 10%;
-  animation-duration: 8s;
-}
-
-.bubble:nth-child(2) {
-  width: 20px;
-  height: 20px;
-  left: 20%;
-  animation-duration: 5s;
-  animation-delay: 1s;
-}
-
-.bubble:nth-child(3) {
-  width: 50px;
-  height: 50px;
-  left: 35%;
-  animation-duration: 7s;
-  animation-delay: 2s;
-}
-
-.bubble:nth-child(4) {
-  width: 30px;
-  height: 30px;
-  left: 50%;
-  animation-duration: 11s;
-  animation-delay: 0s;
-}
-
-.bubble:nth-child(5) {
-  width: 45px;
-  height: 45px;
-  left: 65%;
-  animation-duration: 6s;
-  animation-delay: 1s;
-}
-
-.bubble:nth-child(6) {
-  width: 25px;
-  height: 25px;
-  left: 75%;
-  animation-duration: 8s;
-  animation-delay: 3s;
-}
-
-.bubble:nth-child(7) {
-  width: 35px;
-  height: 35px;
-  left: 85%;
-  animation-duration: 12s;
-  animation-delay: 2s;
-}
-
-.bubble:nth-child(8) {
-  width: 28px;
-  height: 28px;
-  left: 30%;
-  animation-duration: 6s;
-  animation-delay: 4s;
-}
-
-.bubble:nth-child(9) {
-  width: 42px;
-  height: 42px;
-  left: 55%;
-  animation-duration: 9s;
-  animation-delay: 3s;
-}
-
-.bubble:nth-child(10) {
-  width: 38px;
-  height: 38px;
-  left: 40%;
-  animation-duration: 7s;
-  animation-delay: 5s;
-}
-
-.bubble:nth-child(11) {
-  width: 32px;
-  height: 32px;
-  left: 70%;
-  animation-duration: 10s;
-  animation-delay: 4s;
-}
-
-.bubble:nth-child(12) {
-  width: 46px;
-  height: 46px;
-  left: 15%;
-  animation-duration: 8s;
-  animation-delay: 2s;
-}
-
-.bubble:nth-child(13) {
-  width: 24px;
-  height: 24px;
-  left: 60%;
-  animation-duration: 11s;
-  animation-delay: 1s;
-}
-
-.bubble:nth-child(14) {
-  width: 36px;
-  height: 36px;
-  left: 25%;
-  animation-duration: 9s;
-  animation-delay: 3s;
-}
-
-.bubble:nth-child(15) {
-  width: 44px;
-  height: 44px;
-  left: 80%;
-  animation-duration: 7s;
-  animation-delay: 5s;
-}
-
-@keyframes rise {
-  0% {
-    bottom: -100px;
-    transform: translateX(0);
-  }
-  50% {
-    transform: translate(100px, -500px);
-  }
-  100% {
-    bottom: 1080px;
-    transform: translateX(-200px);
-  }
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 </style>

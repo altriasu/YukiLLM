@@ -6,7 +6,7 @@ from fastapi.responses import Response
 
 from settings import *
 from datasetsApi.datasets_api import datasets_api
-from chat.chat_api import chat_api
+from scripts.scripts_api import scripts_api
 
 
 app = FastAPI(max_upload_size = 1024 * 1024 * 1024 * 10) # 100MB
@@ -30,7 +30,7 @@ async def myMiddleware(request: Request, call_next):
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(datasets_api, prefix="/datasets", tags=["数据集管理接口"])
-app.include_router(chat_api, prefix="/chat", tags=["聊天界面接口"])
+app.include_router(scripts_api, prefix="/embdings", tags=["嵌入模型接口"])
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host=HOST, port=PORT, reload=True)
