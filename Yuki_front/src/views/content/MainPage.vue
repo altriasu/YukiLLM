@@ -100,7 +100,7 @@ const selectComponent = (component: string) => {
       showComponent.value = ConfDataset;
       break;
     case "EmptyPage2":
-      showComponent.value = ConfTask; // 假设评估也使用 AIRecord 组件
+      showComponent.value = EmptyPage; // 假设评估也使用 AIRecord 组件
       break;
     case "EmptyPage3":
       showComponent.value = EmptyPage;

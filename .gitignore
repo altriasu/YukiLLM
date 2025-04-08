@@ -28,7 +28,6 @@
 */*.sw?
 
 */*.tsbuildinfo
-
 */.env
 
 # backend

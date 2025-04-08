@@ -10,17 +10,17 @@
         <span class="select-list">
           <div
             class="select-list-left"
-            id="sll1"
+            :class="{ 'select-list-left-dropdown': dropdownIndex === 1 }"
             @click="clickDropdown(1)"
           ></div>
           <div class="select-list-right">
-            {{ ApiConfigStore.config.dataset }}
+            {{ showOptions.dataset }}
           </div>
           <ul v-show="dropdownIndex === 1" class="dropdown-list">
             <li
               v-for="option in item.options"
               :key="option"
-              @click="selectOption(index, option)"
+              @click="selectOption(dropdownIndex, option)"
             >
               {{ option }}
             </li>
@@ -32,17 +32,17 @@
         <span class="select-list">
           <div
             class="select-list-left"
-            id="sll2"
-            @click="clickDropdown(2)"
+            :class="{ 'select-list-left-dropdown': dropdownIndex === 2 }"
+            @click="clickDropdown(2)"   
           ></div>
           <div class="select-list-right">
-            {{ ApiConfigStore.config.embdingModel }}
+            {{ showOptions.embdingModel }}
           </div>
           <ul v-show="dropdownIndex === 2" class="dropdown-list">
             <li
               v-for="option in item.options"
               :key="option"
-              @click="selectOption(index, option)"
+              @click="selectOption(dropdownIndex, option)"
             >
               {{ option }}
             </li>
@@ -54,17 +54,17 @@
         <span class="select-list">
           <div
             class="select-list-left"
-            id="sll3"
+            :class="{ 'select-list-left-dropdown': dropdownIndex === 3 }"
             @click="clickDropdown(3)"
           ></div>
           <div class="select-list-right">
-            {{ ApiConfigStore.config.platform }}
+            {{ showOptions.platform }}
           </div>
           <ul v-show="dropdownIndex === 3" class="dropdown-list">
             <li
               v-for="option in item.options"
               :key="option"
-              @click="selectOption(index, option)"
+              @click="selectOption(dropdownIndex, option)"
             >
               {{ option }}
             </li>
@@ -76,17 +76,17 @@
         <span class="select-list">
           <div
             class="select-list-left"
-            id="sll4"
+            :class="{ 'select-list-left-dropdown': dropdownIndex === 4 }"
             @click="clickDropdown(4)"
           ></div>
           <div class="select-list-right">
-            {{ ApiConfigStore.config.modelName }}
+            {{ showOptions.modelName }}
           </div>
           <ul v-show="dropdownIndex === 4" class="dropdown-list">
             <li
               v-for="option in item.options"
               :key="option"
-              @click="selectOption(index, option)"
+              @click="selectOption(dropdownIndex, option)"
             >
               {{ option }}
             </li>
@@ -98,17 +98,17 @@
         <span class="select-list">
           <div
             class="select-list-left"
-            id="sll5"
+            :class="{ 'select-list-left-dropdown': dropdownIndex === 5 }"
             @click="clickDropdown(5)"
           ></div>
           <div class="select-list-right">
-            {{ ApiConfigStore.config.task }}
+            {{ showOptions.task }}
           </div>
           <ul v-show="dropdownIndex === 5" class="dropdown-list">
             <li
               v-for="option in item.options"
               :key="option"
-              @click="selectOption(index, option)"
+              @click="selectOption(dropdownIndex, option)"
             >
               {{ option }}
             </li>
@@ -124,48 +124,88 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, defineEmits } from "vue";
+import { ref, reactive, onMounted, onBeforeUnmount } from "vue";
 import { useApiConfigStore } from "@/stores/apiConfig";
+import { ElMessage } from "element-plus";
+import { BASE_URL, API } from "@/api/config";
+import { v4 as uuidv4 } from 'uuid';
 
-const ApiConfigStore = useApiConfigStore();
+const apiConfigStore = useApiConfigStore();
 const emit = defineEmits();
+
+const dropdownIndex = ref(0);
+
+let task_id = null;
+const showOptions = reactive({
+  id: task_id,
+  dataset: "RSITMD",
+  embdingModel: "remoteClip",
+  platform: "ALIYUN",
+  modelName: "qvq-max-latest",
+  task: "img2txt"
+});
+
+const selectOptions = ref([
+  { codename: "dataset", name: "数据集选择", options: [] },
+  { codename: "embdingModel", name: "嵌入模型", options: [] },
+  { codename: "platform", name: "大模型平台", options: [] },
+  { codename: "modelName", name: "大模型名称", options: [] },
+  { codename: "task", name: "检索任务选择", options: [] },
+]);
+
+function getOptions() {
+  fetch(BASE_URL + API.CONFIG,{
+    type: 'GET',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+  })
+  .then(res => {
+    if (res.ok){
+      return res.json();
+    }
+    else {
+      ElMessage.error('请求失败，请检查网络连接');
+      return;
+    }
+  })
+  .then(data => {
+    selectOptions.value[0].options = data.dataset;
+    selectOptions.value[1].options = data.embding_model;
+    selectOptions.value[2].options = data.platform;
+    selectOptions.value[3].options = data.model[data.platform[0]]
+    selectOptions.value[4].options = ["img2txt", "txt2img"]
+  })
+}
+
+function selectOption(index, option) {
+  showOptions[selectOptions.value[index - 1].codename] = option;
+  dropdownIndex.value = 0;
+}
 
 function closePopWindow() {
   emit("emitClosePopWindow", false);
-}
+} 
 
 function confirm() {
-  emit("emitConfirm", true)
+  task_id = uuidv4();
+  showOptions.id = task_id;
+  apiConfigStore.addConfig(showOptions);
+  emit("emitConfirm", true, task_id);
 }
 
-const dropdownIndex = ref(0);
-const selectOptions = ref([
-  { name: "数据集选择", options: ["数据集A", "数据集B", "数据集C"] },
-  { name: "嵌入模型", options: ["模型X", "模型Y", "模型Z"] },
-  { name: "大模型平台", options: ["平台1", "平台2", "平台3"] },
-  { name: "大模型名称", options: ["GPT-4", "Gemini", "Claude"] },
-  { name: "检索任务选择", options: ["任务1", "任务2", "任务3"] },
-]);
-
 let item = selectOptions.value[0];
-let Expand = false;
-let ExpandId = 0;
+
 function clickDropdown(id) {
-  dropdownIndex.value = id;
-  const selectListLeft = document.querySelector(`#sll${id}`);
-  if (selectListLeft && !Expand) {
-    selectListLeft.style.transform = "rotate(90deg)";
-    selectListLeft.style.transition = "all 400ms";
-    Expand = true;
-    ExpandId = id;
-  } else if (selectListLeft && Expand) {
-    selectListLeft.style.transform = "";
-    dropdownIndex.value = 0;
-    Expand = false;
-    ExpandId = 0;
+  if (dropdownIndex.value === id) {
+    dropdownIndex.value = 0; // 如果点击的是当前已展开的项，则收起
+  } else {
+    dropdownIndex.value = id; // 展开新项
   }
   item = selectOptions.value[id - 1];
 }
+
+
 
 function handleClickOutside(event) {
   const selectListLeftElements = document.querySelectorAll(".select-list-left");
@@ -177,19 +217,19 @@ function handleClickOutside(event) {
     }
   });
 
+  const confBody = document.querySelector(".confBody");
+  if (confBody && !confBody.contains(event.target)) {
+    dropdownIndex.value = 0;
+  }
+
   if (!clickedInside) {
     dropdownIndex.value = 0;
-    const selectListLeft = document.querySelector(`#sll${ExpandId}`);
-    if (selectListLeft) {
-      selectListLeft.style.transform = "";
-      Expand = false;
-      ExpandId = 0;
-    }
   }
 }
 
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);
+  getOptions();
 });
 
 onBeforeUnmount(() => {
@@ -225,6 +265,7 @@ onBeforeUnmount(() => {
     align-items: center;
     border-radius: 5px;
     box-shadow: inset 0px 2px 5px rgba(0, 0, 0, 0.1);
+    position: relative;
 }
 
 .select-list-left{
@@ -262,14 +303,14 @@ onBeforeUnmount(() => {
 
 .dropdown-list {
     position: absolute;
+    top: 80%; /* 紧贴在 select-list 下方 */
     background: whitesmoke;
     box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
     list-style: none;
-    padding: 5px 0;
     margin-top: 5px;
-    width: 259px;
+    transform: translateX(8%);
+    width: 243px;
     z-index: 10;
-    transform: translateX(3px) translateY(62px);
     opacity: 90%;
     backdrop-filter: blur(10px); 
 }

@@ -7,6 +7,7 @@ import 'element-plus/dist/index.css'
 import App from './App.vue'
 import router from './router'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import 'katex/dist/katex.min.css'
 
 
 const app = createApp(App)

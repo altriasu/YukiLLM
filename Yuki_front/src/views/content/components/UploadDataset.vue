@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, defineEmits, onMounted, onBeforeUnmount } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
 import { ElMessage } from "element-plus";
 import { API, BASE_URL } from '@/api/config';
 const emit = defineEmits();

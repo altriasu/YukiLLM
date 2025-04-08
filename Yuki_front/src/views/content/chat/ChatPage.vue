@@ -46,7 +46,7 @@
               </div>
             </div>
             <div class="content">
-              <div v-html="message.content" class="message-text"></div>
+              <div v-html="renderMarkdown(message.content)" class="message-text"></div>
               <div class="image-container">
                 <img v-for="(img, index) in message.images" :key="index" :src="img" class="streamed-img"/>
               </div>
@@ -105,7 +105,7 @@
     </div>
     <div v-if="isShowConfTask"  class="backdrop"></div>
       <div v-if="isShowConfTask" class="pop-window">
-          <ConfTask @emitClosePopWindow="closePopWindow()" @emitConfirm="createNewConversation()"/>
+          <ConfTask @emitClosePopWindow="closePopWindow" @emitConfirm="createNewConversation"/>
       </div>
     </div>
 </template>
@@ -116,19 +116,22 @@ import { Link, Microphone } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import { get, post } from "@/utils/request";
 import { BASE_URL, API } from "@/api/config";
+import { v4 as uuidv4 } from 'uuid';
 
 import { useApiConfigStore } from "@/stores/apiConfig";
-import ConfTask from "@/views/content/components/ConfTask.vue"
+import { renderMarkdown } from "@/assets/js/markdown";
+import ConfTask from "@/views/content/components/ConfTask.vue";
 
 const apiConfigStore = useApiConfigStore();
 const historyList = ref([
   {
     title: "直接使用大模型",
+    task_id: "default",
     messages: [
       {
         role: "assistant",
         content:
-          `您好！我是${apiConfigStore.config.platform}平台的${apiConfigStore.config.modelName}，你可以向我提出一些问题？`,
+          `您好！我是${apiConfigStore.config[0].platform}平台的${apiConfigStore.config[0].modelName}，你可以向我提出一些问题？`,
       },
     ],
   },
@@ -156,11 +159,13 @@ const newConversation = () => {
   openPopWindow();
 };
 
+
 // <---------------------------------- 新建任务 ------------------------------------------->
-const createNewConversation = (value) => {
+const createNewConversation = (flag, taskId) => {
   closePopWindow();
   historyList.value.unshift({
     title: "新任务",
+    task_id: taskId,
     // 实际上这里要和后端交互的话，messages 最好用 map 格式，key 是对应的 id，这样方便后端根据 id 来操作消息
     messages: [
       {
@@ -219,17 +224,138 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function typeWriter(text, targetRef, delay = 10) {
+async function typeWriter(text, message, delay = 10) {
   for (let char of text) {
     await sleep(delay);
-    if (char === '\n') {
-      targetRef.content += '<br/>';  // 支持换行
-    } else {
-      targetRef.content += char;
-    }
+    message.content += char;
   }
 }
 
+
+
+const useEmbeding = async (taskConfig) => {
+  const formdata = new FormData();
+  formdata.append("dataset_name", taskConfig.dataset);
+  formdata.append("task_id", taskConfig.id);
+  formdata.append("retrieve_type", taskConfig.task);
+  formdata.append("file", uploadFile)
+
+  const loadingMessage = ref({
+    role: "assistant",
+    content: "检索开始...<br>",
+    loading: true, // 标记为加载状态
+    images: []
+  });
+
+  fetch(BASE_URL + API.REMOTECLIP, {
+    method: 'POST',
+    body: formdata
+  })
+  .then(response => {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    function read() {
+      reader.read().then(async ({ done, value }) => {
+        if (done) return;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop();
+
+        for (const part of parts) {
+          try {
+            const msg = JSON.parse(part);
+
+            if (msg.type === "progress") {
+              await typeWriter(`检索中...${msg.data}`, loadingMessage.value);
+            } else if (msg.type === "hint") {
+              await typeWriter(msg.data, loadingMessage.value);
+            } else if (msg.type === "result_img") {
+              loadingMessage.value.images.push(msg.data);
+            } else if (msg.type === "result_txt") {
+              await typeWriter(msg.data, loadingMessage.value);
+            } else if (msg.type === "error") {
+              loadingMessage.value.content = "检索失败，请稍后重试";
+            }
+          } catch (e) {
+            console.error("JSON parse error", e);
+          }
+        }
+
+        read();
+      });
+    }
+
+    read();
+  });
+
+  currentConversation.value.messages.push(loadingMessage.value);
+  nextTick(() => {
+    scrollToBottom();
+  });
+}
+
+const useLLM = async (taskConfig) => {
+  const loadingMessage = ref({
+    role: "assistant",
+    content: "思考中，请稍候...<br>",
+    loading: true, // 标记为加载状态
+    images: []
+  });
+
+  const formdata = new FormData();
+  formdata.append("platform", taskConfig.platform);
+  formdata.append("model", taskConfig.modelName);
+  formdata.append("taskId", taskConfig.id);
+  formdata.append("messages", JSON.stringify(historyList.value[currentConversationIndex.value].messages));
+  if (uploadFile) {
+    formdata.append("img", uploadFile);
+  }
+
+  fetch(BASE_URL + API.LLM, {
+    method: 'POST',
+    body: formdata
+  })
+  .then(response => {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    function read() {
+      reader.read().then(async ({ done, value }) => {
+        if (done) return;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop();
+
+        for (const part of parts) {
+          try {
+            let msg = JSON.parse(part);
+            console.log(msg);
+            loadingMessage.value.loading = false;
+            //latex格式要求严格
+            await typeWriter(msg, loadingMessage.value);
+            // loadingMessage.value.content += msg;
+          } catch (e) {
+            ElMessage.error("网络问题, 请稍后重试");
+          }
+        }
+
+        read();
+      });
+    }
+
+    read();
+  });
+
+  currentConversation.value.messages.push(loadingMessage.value);
+  nextTick(() => {
+    scrollToBottom();
+  });
+}
 
 const sendMessage = async () => {
   if (userInput.value.trim()) {
@@ -244,67 +370,14 @@ const sendMessage = async () => {
       scrollToBottom();
     });
 
-    const formdata = new FormData();
-    formdata.append("dataset_name", "RSITMD");
-    formdata.append("task_id", "jiujiu");
-    formdata.append("retrieve_type", "img2txt");
-    formdata.append("file", uploadFile)
-
-    const loadingMessage = ref({
-      role: "assistant",
-      content: "检索开始...<br>",
-      loading: true, // 标记为加载状态
-      images: []
-    });
-
-    fetch(BASE_URL + API.REMOTECLIP, {
-      method: 'POST',
-      body: formdata
-    })
-    .then(response => {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      function read() {
-        reader.read().then(async ({ done, value }) => {
-          if (done) return;
-
-          buffer += decoder.decode(value, { stream: true });
-          const parts = buffer.split("\n\n");
-          buffer = parts.pop();
-
-          for (const part of parts) {
-            try {
-              const msg = JSON.parse(part);
-
-              if (msg.type === "progress") {
-                await typeWriter(`检索中...${msg.data}`, loadingMessage.value);
-              } else if (msg.type === "hint") {
-                await typeWriter(msg.data, loadingMessage.value);
-              } else if (msg.type === "result_img") {
-                loadingMessage.value.images.push(msg.data);
-              } else if (msg.type === "result_txt") {
-                await typeWriter(msg.data, loadingMessage.value);
-              } else if (msg.type === "error") {
-                loadingMessage.value.content = "检索失败，请稍后重试";
-              }
-            } catch (e) {
-              console.error("JSON parse error", e);
-            }
-          }
-
-          read();
-        });
-      }
-
-      read();
-    });
-
-    currentConversation.value.messages.push(loadingMessage.value);
-    nextTick(() => {
-      scrollToBottom();
-    });
+    const taskId = historyList.value[currentConversationIndex.value].task_id;
+    if (taskId === "default") {
+      useLLM(apiConfigStore.config[0]);
+      // console.log(renderMarkdown("\[ \cos(x) = 1 - \frac{x^2}{2!} + \frac{x^4}{4!} - \cdots \]"))
+    } else {
+      const taskConfig = apiConfigStore.getConfigById(taskId).value;
+      useEmbeding(taskConfig);
+    }
   }
 };
 
@@ -335,6 +408,7 @@ function handleClickOutside(event) {
 
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);
+  
 });
 
 onBeforeUnmount(() => {
@@ -343,6 +417,16 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+@import 'katex/dist/katex.min.css';
+
+.katex {
+  background-color: red;
+  font-size: 1.2em;
+  position: relative;
+  top: 0.2em;
+}
+
+
 /* 样式保持不变 */
 .ai-practice-container {
   display: flex;

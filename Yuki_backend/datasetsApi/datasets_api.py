@@ -10,7 +10,7 @@ import os
 
 datasets_api = APIRouter()
 
-@datasets_api.get("/")
+@datasets_api.get("")
 async def datasets_details():
     datasets = []
     for dir in os.listdir(os.path.join(STATIC_DIR, "datasets")):
@@ -18,7 +18,7 @@ async def datasets_details():
         datasets.append({"name": dir, "description": f"{dir}数据集，有图片{imgsCount}张"})
     return datasets
 
-@datasets_api.post("/")
+@datasets_api.post("")
 async def datasets_upload(
     name: str = Form(...),
     description: str = Form(...),
@@ -50,7 +50,7 @@ async def datasets_upload(
 
     return {"code": 200, "msg": "上传成功", "data": {}}
 
-@datasets_api.delete("/")
+@datasets_api.delete("")
 async def datasets_delete(request: Request):
     request = await request.json()
     dataset_path = os.path.join(STATIC_DIR, "datasets", request["name"])

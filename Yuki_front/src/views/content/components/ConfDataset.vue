@@ -69,7 +69,6 @@ function closePopWindow(value) {
 }
 
 function deleteDataset(datasetName) {
-  console.log(datasetName);
   fetch(BASE_URL + API.DATASETS, {
     method: 'DELETE',
     headers: {

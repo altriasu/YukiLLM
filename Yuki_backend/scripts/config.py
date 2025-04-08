@@ -15,5 +15,28 @@ REMOTE_CLIP = {
     "device": "cuda"
 }
 
+CHAT_CONFIG = {
+    "platform" : ["ALIYUN", "OPENAI"],
+    "embdingModel" : ["remoteClip"]
+}
+
+
+LLM_CONFIG = {
+    "model" : {
+        "ALIYUN" : ["qvq-max-latest", "qwen-vl-max-0125"], 
+        "OPENAI" : ["chatgpt-4o"]
+    },
+    "APIKEY": {
+        "ALIYUN" : os.getenv("DASHSCOPE_API_KEY"),
+        "OPENAI" : os.getenv("OPENAI_API_KEY")
+    },
+    "BASE_URL": {
+        "ALIYUN" : "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+        "OPENAI" : "https://api.openai.com/v1/chat/completions"
+    },
+    "MAX_API_RETRY" : 3,
+    "REQ_TIME_GAP" : 10,
+}
+
 from settings import STATIC_DIR
 DATASET_DIR = os.path.join(current_path, "../static/datasets/")
