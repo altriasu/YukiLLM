@@ -1,14 +1,7 @@
-import os
-import openai
-from openai import OpenAI
-from PIL import Image
 import asyncio
 import httpx
-import base64
 import json
-from typing import List, Dict
-
-from scripts.config import * 
+from utils.config import * 
 
 async def query_LLM_streaming(platform: str, model: str, messages: str):
     async with httpx.AsyncClient(timeout=None) as client:
@@ -20,6 +13,7 @@ async def query_LLM_streaming(platform: str, model: str, messages: str):
                     LLM_CONFIG["BASE_URL"][platform],
                     headers={
                         "Authorization": f"Bearer {LLM_CONFIG['APIKEY'][platform]}",
+                        "Content-Type": "application/json",
                     },
                     json={
                         "model": model,
@@ -73,29 +67,3 @@ async def query_LLM_streaming(platform: str, model: str, messages: str):
                 await asyncio.sleep(LLM_CONFIG["REQ_TIME_GAP"])
 
         yield "【网络错误，请稍后再试】"
-
-
-async def start_LLM(platform: str, model: str, messages: List[Dict], image_path: str):
-    if image_path:
-        sys_prompt = {
-            "role" : "system",
-            "content": "你是一个多模态智能体，擅长从图像与文本中提取关键信息并进行推理。\n" +
-                    "用户可以上传一张图片，并附带相关描述或问题。\n" +
-                    "请结合图像与文本内容进行分析，做出合理推断，并解释你的推理依据。"
-        }
-        messages[0] = sys_prompt
-        image_data = base64.b64encode(open(image_path, "rb").read()).decode("utf-8")
-        img_prompt = {
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpg;base64,{image_data}"}
-            }
-        messages.append(img_prompt)
-    else:
-        sys_prompt = {
-            "role" : "system",
-            "content": "你是一个语言理解与推理专家，擅长判断文本中的因果关系、对话逻辑、情感变化和事实一致性。\n" +
-                    "请根据用户提供的文本，完成合理的推理任务。你的回答要清晰、简洁、逻辑严谨。"
-        }
-        messages[0] = sys_prompt
-    async for chunk in query_LLM_streaming(platform, model, messages):
-        yield chunk

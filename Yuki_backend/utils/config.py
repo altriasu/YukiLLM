@@ -16,14 +16,14 @@ REMOTE_CLIP = {
 }
 
 CHAT_CONFIG = {
-    "platform" : ["ALIYUN", "OPENAI"],
+    "platform" : ["ALIYUN"],
     "embdingModel" : ["remoteClip"]
 }
 
 
 LLM_CONFIG = {
     "model" : {
-        "ALIYUN" : ["qvq-max-latest", "qwen-vl-max-0125"], 
+        "ALIYUN" : ["qvq-max-latest", "qwen-vl-max-0125", "deepseek-r1", "deepseek-r1-distill-llama-70b"], 
         "OPENAI" : ["chatgpt-4o"]
     },
     "APIKEY": {

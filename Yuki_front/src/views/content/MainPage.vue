@@ -38,7 +38,7 @@
             <el-icon><Document /></el-icon>
             <span>数据集上传</span>
           </div>
-          <div
+          <!-- <div
             class="nav-menu-item"
             :class="{ active: currentComponent === 'EmptyPage2' }"
             @click="selectComponent('EmptyPage2')"
@@ -53,7 +53,7 @@
           >
             <el-icon><User /></el-icon>
             <span>页面</span>
-          </div>
+          </div> -->
         </el-menu>
 
         <!-- 底部图标部分保持不变 -->
@@ -99,27 +99,27 @@ const selectComponent = (component: string) => {
     case "EmptyPage1":
       showComponent.value = ConfDataset;
       break;
-    case "EmptyPage2":
-      showComponent.value = EmptyPage; // 假设评估也使用 AIRecord 组件
-      break;
-    case "EmptyPage3":
-      showComponent.value = EmptyPage;
-      break;
+    // case "EmptyPage2":
+    //   showComponent.value = EmptyPage; // 假设评估也使用 AIRecord 组件
+    //   break;
+    // case "EmptyPage3":
+    //   showComponent.value = EmptyPage;
+    //   break;
   }
 };
 
 const handleToolsClick = () => {
   // 处理工具图标点击事件
-  console.log("工具图标被点击");
+  router.push("/datasets")
 };
 
 const handleHomeClick = () => {
   // 处理首页图标点击事件
-  console.log("首页图标被点击");
+  router.push("/")
 };
 
 const goToLogin = () => {
-  router.push("/login");
+  router.push("/");
 };
 </script>
 

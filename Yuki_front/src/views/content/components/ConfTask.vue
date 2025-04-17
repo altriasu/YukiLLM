@@ -142,7 +142,7 @@ const showOptions = reactive({
   embdingModel: "remoteClip",
   platform: "ALIYUN",
   modelName: "qvq-max-latest",
-  task: "img2txt"
+  task: "chat"
 });
 
 const selectOptions = ref([
@@ -174,7 +174,7 @@ function getOptions() {
     selectOptions.value[1].options = data.embding_model;
     selectOptions.value[2].options = data.platform;
     selectOptions.value[3].options = data.model[data.platform[0]]
-    selectOptions.value[4].options = ["img2txt", "txt2img"]
+    selectOptions.value[4].options = ["img2txt", "txt2img", "chat"]
   })
 }
 
@@ -191,7 +191,7 @@ function confirm() {
   task_id = uuidv4();
   showOptions.id = task_id;
   apiConfigStore.addConfig(showOptions);
-  emit("emitConfirm", true, task_id);
+  emit("emitConfirm", true, task_id, showOptions.task);
 }
 
 let item = selectOptions.value[0];

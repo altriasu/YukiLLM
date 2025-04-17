@@ -5,9 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from settings import *
-from datasetsApi.datasets_api import datasets_api
-from scripts.scripts_api import scripts_api
-from scripts.chat_api import chat_api
+from api.datasets_api import datasets_api
+from api.retrieve_api import retrieve_api
+from api.chat_api import chat_api
 
 
 app = FastAPI(max_upload_size = 1024 * 1024 * 1024 * 10) # 100MB
@@ -31,7 +31,7 @@ async def myMiddleware(request: Request, call_next):
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(datasets_api, prefix="/datasets", tags=["数据集管理接口"])
-app.include_router(scripts_api, prefix="/embdings", tags=["嵌入模型接口"])
+app.include_router(retrieve_api, prefix="/retrieve", tags=["检索接口"])
 app.include_router(chat_api, prefix="/chat", tags=["聊天接口"])
 
 if __name__ == "__main__":

@@ -29,6 +29,9 @@
 
     <!-- 右侧对话页面 -->
     <div class="chat-wrapper">
+      <div v-show="isScrolledToBottom" @click="scrollToBottom()" class="scroll-to-bottom">
+        <el-icon><Bottom /></el-icon>
+      </div>
       <div class="chat-panel">
         <!-- 上半部分聊天界面 -->
         <div class="chat-messages" ref="chatMessagesRef">
@@ -39,16 +42,25 @@
           >
             <div class="avatar">
               <div v-if="message.role !== 'user'" class="ai-avatar">
-                <img src="@/assets/images/hailuo2.png" alt="AI Avatar" />
+                <img  src="@/assets/images/yuki.png" alt="AI Avatar" />
               </div>
               <div v-else>
-                <img src="@/assets/images/user.png" alt="Me" />
+                <img src="@/assets/images/AEGIS.png" alt="Me" />
               </div>
             </div>
             <div class="content">
-              <div v-html="renderMarkdown(message.content)" class="message-text"></div>
+              <div v-if="message.role !== 'user' && index !== 0" class="reasoning-container">
+                <div class="reasoning-head">
+                  <el-icon><MagicStick /></el-icon>
+                  <span v-if="!currentReasoning.reasoning_messages[index].isCompleted">(っ•̀ω•́)っ✎⁾⁾思考中...</span> <span v-else>( ´▽` )ﾉ思考完成</span>
+                  <el-icon @click="isOpenReasoningContent(index, false)" v-if="currentReasoning.reasoning_messages[index].isOpend" style="font-size: 70%; margin-left: 20px; cursor: pointer;"><ArrowUpBold /></el-icon>
+                  <el-icon @click="isOpenReasoningContent(index, true)" v-else style="font-size: 70%; margin-left: 20px; cursor: pointer;"><ArrowDownBold /></el-icon>
+                </div>
+              </div>
+              <div class="markdown-diy"><div v-if="currentReasoning.reasoning_messages[index].isOpend" v-html="renderMarkdown(currentReasoning.reasoning_messages[index].content)" class="reasoning-text"></div></div>
+              <div class="markdown-diy"><div v-html="renderMarkdown(message.content)" class="message-text"></div></div>
               <div class="image-container">
-                <img v-for="(img, index) in message.images" :key="index" :src="img" class="streamed-img"/>
+                <img v-for="(img, i) in currentReasoning.reasoning_messages[index].imgs" :key="i" :src="img" class="streamed-img"/>
               </div>
             </div>
           </div>
@@ -57,20 +69,25 @@
         <!-- 输入框 -->
         <div class="input-area">
           <div class="input-wrapper">
-            <el-icon @click="triggerFileInput('file')" v-if="isTxt2ImgRetrieve" class="input-icon">
-              <input type="file" ref="fileInput" style="display: none" @change="handleFileUpload" />
-              <DocumentAdd />
-            </el-icon>
-            <el-icon @click="triggerFileInput('file')" v-else class="input-icon">
-              <input type="file" ref="fileInput" style="display: none" @change="handleFileUpload" />
-              <Picture/>
-            </el-icon>
+            <div v-if="isUploadedFile">
+              <el-icon class="input-icon"><CircleCheckFilled /></el-icon>
+            </div>
+            <div v-else class="input-icon-group">
+              <el-icon @click="triggerFileInput('file')" v-if="isTxt2ImgRetrieve" class="input-icon">
+                <input type="file" ref="fileInput" style="display: none" @change="handleFileUpload" accept=".txt" />
+                <DocumentAdd />
+              </el-icon>
+              <el-icon @click="triggerFileInput('file')" v-else class="input-icon">
+                <input type="file" ref="fileInput" style="display: none" @change="handleFileUpload" accept="image/*" />
+                <Picture/>
+              </el-icon>
+            </div>
             <input
+              id = "input-message"
               v-model="userInput"
               @keyup.enter="sendMessage"
               placeholder="输入消息，按回车发送..."
               type="text"
-              :disabled="isInputDisabled"
             />
             <div class="button-group">
               <div class="separator"></div>
@@ -78,21 +95,21 @@
                 placement="top"
                 :width="200"
                 trigger="hover"
-                :disabled="!!userInput.trim()"
+                :disabled="!!isInputDisabled"
               >
                 <template #reference>
                   <el-button
                     class="send-button"
                     circle
                     @click="sendMessage"
-                    :disabled="!userInput.trim()"
+                    :disabled="!isInputDisabled"
                   >
-                    <el-icon>
-                      <Top />
-                    </el-icon>
+                    <el-icon><Top /></el-icon>
+                    <!-- <el-icon v-show="!nextSentMessage"><Cpu /></el-icon> -->
                   </el-button>
                 </template>
                 <span>请上传图片/文字回复</span>
+                <!-- <span v-show="!nextSentMessage">停止回答</span> -->
               </el-popover>
             </div>
           </div>
@@ -131,19 +148,33 @@ const historyList = ref([
       {
         role: "assistant",
         content:
-          `您好！我是${apiConfigStore.config[0].platform}平台的${apiConfigStore.config[0].modelName}，你可以向我提出一些问题？`,
+          `您好！我是结城理，你可以向我提出一些问题。`,
       },
     ],
   },
 ]);
 
+const reasoningList = ref([{
+  task_id: "default",
+  reasoning_messages: [
+    {
+      isOpend: false,
+      isCompleted: false,
+      content: "",
+      imgs: []
+    }
+  ]
+}]);
+
+const isOpenReasoningContent = (index, isOpend) => {
+  currentReasoning.value.reasoning_messages[index].isOpend = isOpend;
+}
+
 // <---------------------------------- 弹窗 -------------------------------------------->
 const currentConversationIndex = ref(0);
 const userInput = ref("");
-const isListening = ref(false);
 const chatMessagesRef = ref(null);
-const isInputDisabled = ref(false);
-const isTxt2ImgRetrieve = ref(false);
+
 const isShowConfTask = ref(false);
 let chatCount = ref(1)
 
@@ -159,24 +190,75 @@ const newConversation = () => {
   openPopWindow();
 };
 
+const isInputDisabled = computed(() => {
+  if (taskConfig.value.task !== "chat" && uploadFile.value !== null){
+    return true;
+  } else if (taskConfig.value.task !== "chat" && userInput.value.trim() === "检索图像的对应文本") {
+    return false;
+  } else if (taskConfig.value.task !== "chat" && userInput.value.trim() === "检索文本对应图像") {
+    return false;
+  } else if (userInput.value.trim() !== "") {
+    return true;
+  } 
+});
+
 
 // <---------------------------------- 新建任务 ------------------------------------------->
-const createNewConversation = (flag, taskId) => {
+const createNewConversation = (flag, taskId, taskType) => {
   closePopWindow();
+  
+  let title = "";
+  if (taskType === "img2txt") {
+    title = "检索图像的对应文本"
+  } else if (taskType === "txt2img") {
+    title = "检索文本对应图像"
+  } else {
+    title = "直接使用大模型"
+  }
+
   historyList.value.unshift({
-    title: "新任务",
+    title: title,
     task_id: taskId,
     // 实际上这里要和后端交互的话，messages 最好用 map 格式，key 是对应的 id，这样方便后端根据 id 来操作消息
     messages: [
       {
         role: "assistant",
-        content:
-          "您好！我是蟹堡王的神奇海螺，很高兴为您服务！我可以回答关于蟹堡王和汉堡制作的任何问题，您有什么需要帮助的吗？",
+        content: 
+          "你好！我是结城理，你可以向我问一些问题。",
       },
     ],
   });
+  reasoningList.value.unshift({
+    task_id: taskId,
+    reasoning_messages: [
+      {
+        isOpend: false,
+        isCompleted: false,
+        content: "",
+        imgs: []
+      },
+    ]
+  });
+
   currentConversationIndex.value = 0;
   chatCount.value = chatCount.value + 1;
+  changeTask();
+}
+
+const changeTask = () => {
+  if (taskConfig.value.task === "img2txt"){
+    document.querySelector("#input-message").style = "user-select: none;"
+    userInput.value = "检索图像的对应文本"
+    document.querySelector("#input-message").disabled = true;
+  } else if (taskConfig.value.task === "txt2img"){
+    document.querySelector("#input-message").style = "user-select: none;"
+    userInput.value = "检索文本对应图像"
+    document.querySelector("#input-message").disabled = true;
+  } else {
+    document.querySelector("#input-message").style = "user-select: unset;"
+    userInput.value = ""
+    document.querySelector("#input-message").disabled = false;
+  }
 }
 
 const isInputTitle = ref(null);
@@ -200,8 +282,26 @@ const currentConversation = computed(
   () => historyList.value[currentConversationIndex.value]
 );
 
+const currentReasoning = computed(
+  () => reasoningList.value[currentConversationIndex.value]
+);
+
+const taskConfig = computed(() => {
+  const taskId = currentConversation.value.task_id;
+  return apiConfigStore.getConfigById(taskId).value;
+});
+
+const isTxt2ImgRetrieve = computed(() => {
+  if (taskConfig.value.task === "txt2img") {
+    return true;
+  } else {
+    return false;
+  }
+})
+
 const selectConversation = (index) => {
   currentConversationIndex.value = index;
+  changeTask();
   nextTick(() => {
     scrollToBottom();
   });
@@ -210,42 +310,56 @@ const selectConversation = (index) => {
 
 // <---------------------------------- 发送信息 ------------------------------------------->
 const fileInput = ref(null);
-let uploadFile = null;
+const uploadFile = ref(null);
+const isUploadedFile = ref(false);
 
 const triggerFileInput = () => {
   fileInput.value.click()
 }
 
 const handleFileUpload = (event) => {
-  uploadFile = event.target.files[0];
+  uploadFile.value = event.target.files[0];
+  isUploadedFile.value = true;
 }
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function typeWriter(text, message, delay = 10) {
-  for (let char of text) {
+async function typeWriter(text, message, type = "char", delay = 10) {
+  if (type === "char"){
+    for (let char of text) {
+      await sleep(delay);
+      message.content += char;
+    }
+  } else if (type === "line" ){
     await sleep(delay);
-    message.content += char;
+    message.content += text
   }
 }
 
-
-
-const useEmbeding = async (taskConfig) => {
+const useEmbeding = async () => {
   const formdata = new FormData();
-  formdata.append("dataset_name", taskConfig.dataset);
-  formdata.append("task_id", taskConfig.id);
-  formdata.append("retrieve_type", taskConfig.task);
-  formdata.append("file", uploadFile)
+  formdata.append("dataset_name", taskConfig.value.dataset);
+  formdata.append("task_id", taskConfig.value.id);
+  formdata.append("retrieve_type", taskConfig.value.task);
+  formdata.append("file", uploadFile.value)
 
   const loadingMessage = ref({
     role: "assistant",
-    content: "检索开始...<br>",
-    loading: true, // 标记为加载状态
-    images: []
+    content: "",
   });
+
+  const reasoningMessage = ref({
+    isOpend: true,
+    isCompleted: false,
+    content: "",
+    imgs: []
+  })
+
+  nextTick(() => {
+      scrollToBottom();
+    });
 
   fetch(BASE_URL + API.REMOTECLIP, {
     method: 'POST',
@@ -267,17 +381,37 @@ const useEmbeding = async (taskConfig) => {
         for (const part of parts) {
           try {
             const msg = JSON.parse(part);
-
+            
             if (msg.type === "progress") {
-              await typeWriter(`检索中...${msg.data}`, loadingMessage.value);
+              reasoningMessage.value.content = "";
+              await typeWriter(`#### 向量模型检索中...${msg.data}`, reasoningMessage.value);
             } else if (msg.type === "hint") {
-              await typeWriter(msg.data, loadingMessage.value);
+              await typeWriter(msg.data, reasoningMessage.value);
             } else if (msg.type === "result_img") {
-              loadingMessage.value.images.push(msg.data);
+              const imgHtml = `<div style="display: inline-block; margin: 5px;" class="result-item">
+                                <img src="${msg.data.image}" style="width: 100px; height: 100px;" class="result-image"/>
+                                <div class="score">Score: ${msg.data.score}</div>
+                              </div>`;
+              reasoningMessage.value.content += imgHtml;
+              await sleep(100);
             } else if (msg.type === "result_txt") {
-              await typeWriter(msg.data, loadingMessage.value);
+              await typeWriter(msg.data, reasoningMessage.value);
+            } else if (msg.type === "reasoning_content" && msg.message !== null){
+              await typeWriter(msg.message, reasoningMessage.value, "line");
+            } else if (msg.type === "content" && msg.message !== null) {
+              await typeWriter(msg.message, loadingMessage.value, "line");
+              reasoningMessage.value.isCompleted = true;
+            } else if (msg.type === "img_content" && msg.message !== null) {
+              const imgHtml = `<div style="display: inline-block; margin: 5px;" class="result-item">
+                                <img src="${msg.message.image}" style="width: 100px; height: 100px;" class="result-image"/>
+                                <div class="score">Score: ${msg.message.score}</div>
+                              </div>`;
+              loadingMessage.value.content += imgHtml;
+              await sleep(100);
+              reasoningMessage.value.isCompleted = true;
             } else if (msg.type === "error") {
-              loadingMessage.value.content = "检索失败，请稍后重试";
+              /* reasoningMessage.value.content = "检索失败，请稍后重试"; */
+              console.log(msg);
             }
           } catch (e) {
             console.error("JSON parse error", e);
@@ -291,27 +425,33 @@ const useEmbeding = async (taskConfig) => {
     read();
   });
 
+  currentReasoning.value.reasoning_messages.push(reasoningMessage.value);
   currentConversation.value.messages.push(loadingMessage.value);
   nextTick(() => {
     scrollToBottom();
   });
 }
 
-const useLLM = async (taskConfig) => {
+const useLLM = async () => {
   const loadingMessage = ref({
     role: "assistant",
-    content: "思考中，请稍候...<br>",
-    loading: true, // 标记为加载状态
-    images: []
+    content: "",
   });
 
+  const reasoningMessage = ref({
+    isOpend: true,
+    isCompleted: false,
+    content: "",
+    imgs: []
+  })
+
   const formdata = new FormData();
-  formdata.append("platform", taskConfig.platform);
-  formdata.append("model", taskConfig.modelName);
-  formdata.append("taskId", taskConfig.id);
+  formdata.append("platform", taskConfig.value.platform);
+  formdata.append("model", taskConfig.value.modelName);
+  formdata.append("taskId", taskConfig.value.id);
   formdata.append("messages", JSON.stringify(historyList.value[currentConversationIndex.value].messages));
-  if (uploadFile) {
-    formdata.append("img", uploadFile);
+  if (uploadFile.value) {
+    formdata.append("img", uploadFile.value);
   }
 
   fetch(BASE_URL + API.LLM, {
@@ -333,24 +473,26 @@ const useLLM = async (taskConfig) => {
 
         for (const part of parts) {
           try {
-            let msg = JSON.parse(part);
-            console.log(msg);
-            loadingMessage.value.loading = false;
-            //latex格式要求严格
-            await typeWriter(msg, loadingMessage.value);
+            const msg = JSON.parse(part);
+            // console.log(msg);
+            if (msg.type === "reasoning_content" && msg.message !== null){
+              await typeWriter(msg.message, reasoningMessage.value, "line");
+            } else if (msg.type === "content" && msg.message !== null) {
+              await typeWriter(msg.message, loadingMessage.value, "line");
+              reasoningMessage.value.isCompleted = true;
+            } 
             // loadingMessage.value.content += msg;
           } catch (e) {
-            ElMessage.error("网络问题, 请稍后重试");
+            console.log(e);
           }
         }
 
         read();
       });
     }
-
     read();
-  });
-
+  })
+  currentReasoning.value.reasoning_messages.push(reasoningMessage.value);
   currentConversation.value.messages.push(loadingMessage.value);
   nextTick(() => {
     scrollToBottom();
@@ -359,28 +501,65 @@ const useLLM = async (taskConfig) => {
 
 const sendMessage = async () => {
   if (userInput.value.trim()) {
+    const userMessage = {
+        role: "user",
+        content: userInput.value,
+    }
     // 添加用户消息
-    currentConversation.value.messages.push({
-      role: "user",
-      content: userInput.value,
+    currentConversation.value.messages.push(userMessage);
+
+    const reasoningMessage = ref({
+      isOpend: true,
+      isCompleted: false,
+      content: "",
+      imgs: []
     });
-    const prompt = userInput.value;
+
+    if (isUploadedFile.value && taskConfig.value.task !== "txt2img") {
+      reasoningMessage.value.imgs.push(URL.createObjectURL(uploadFile.value));
+    }
+
+    if (isUploadedFile.value && taskConfig.value.task === "txt2img") {
+      reasoningMessage.value.imgs = []
+      if (uploadFile.value.type === "text/plain" || uploadFile.value.name.endsWith('.txt')) {
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+          // 获取文本内容
+          const textContent = e.target.result;
+          reasoningMessage.value.content = textContent;
+        };
+        
+        reader.onerror = (e) => {
+          console.error('文件读取错误:', e.target.error);
+          ElMessage.error('文件读取失败');
+        };
+        reader.readAsText(uploadFile.value);
+      }
+    }
+
+    currentReasoning.value.reasoning_messages.push(reasoningMessage.value);
+
     userInput.value = "";
     nextTick(() => {
       scrollToBottom();
     });
 
     const taskId = historyList.value[currentConversationIndex.value].task_id;
-    if (taskId === "default") {
-      useLLM(apiConfigStore.config[0]);
-      // console.log(renderMarkdown("\[ \cos(x) = 1 - \frac{x^2}{2!} + \frac{x^4}{4!} - \cdots \]"))
+    if (taskConfig.value.task === "chat") {
+      await useLLM();
     } else {
-      const taskConfig = apiConfigStore.getConfigById(taskId).value;
-      useEmbeding(taskConfig);
+      await useEmbeding();
     }
+
+    uploadFile.value = null;
+    isUploadedFile.value = false;
+
+    changeTask();
   }
 };
 
+const isScrolledToBottom = ref(false)
 
 const scrollToBottom = () => {
   const chatMessages = chatMessagesRef.value;
@@ -408,24 +587,37 @@ function handleClickOutside(event) {
 
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);
-  
+  if (chatMessagesRef.value) {
+    chatMessagesRef.value.addEventListener('scroll', () => {
+      const el = chatMessagesRef.value;
+      isScrolledToBottom.value = el.scrollTop + el.clientHeight <= el.scrollHeight - 1;
+    });
+  }
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener("click", handleClickOutside);
+  currentConversation.value.messages.forEach(msg => {
+    msg.images?.forEach(url => URL.revokeObjectURL(url));
+  });
 });
 </script>
 
 <style scoped>
+/* markdown latex 样式 */
 @import 'katex/dist/katex.min.css';
+@import url('@/assets/css/markdown.css');
 
-.katex {
-  background-color: red;
-  font-size: 1.2em;
-  position: relative;
-  top: 0.2em;
+* {
+  overflow: hidden;
 }
 
+
+.katex-display {
+  overflow-x: auto;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 
 /* 样式保持不变 */
 .ai-practice-container {
@@ -518,7 +710,7 @@ onBeforeUnmount(() => {
   background-color: rgba(0, 105, 224, 0.15);
   color: #0052bc;
 }
- 
+
 .history-list-title {
   height: auto;
   width: 175px;
@@ -543,7 +735,7 @@ onBeforeUnmount(() => {
 
 .history-list-icon{
   height: auto;
-  weight: 50px;
+  width: 50px;
   font-size: 18px;
   opacity: 0;
 }
@@ -566,6 +758,7 @@ onBeforeUnmount(() => {
 }
 
 .chat-wrapper {
+  position: relative;
   flex: 1;
   display: flex;
   justify-content: center;
@@ -631,10 +824,8 @@ onBeforeUnmount(() => {
 }
 
 .message .avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #ffffff;
+  width: 80px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -645,21 +836,21 @@ onBeforeUnmount(() => {
 .message .avatar img {
   width: 100%;
   height: 100%;
+  border-radius: 10px;
   object-fit: cover;
-  border-radius: 50%;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #ffffff;
+  
 }
 
 .message .content {
   background-color: rgba(255, 255, 255, 1);
   padding: 12px 18px; /* 增加内边距 */
   border-radius: 10px;
+  margin-top: 40px;
   max-width: 80%;
-  font-size: 16px; /* 增加字体大小 */
   line-height: 1.8; /* 增加行高 */
 }
 
@@ -676,6 +867,64 @@ onBeforeUnmount(() => {
   background-color: rgba(0, 105, 224, 0.12);
   color: black;
 }
+
+.message-text {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.reasoning-head {
+  background-color: #f2f2f2;
+  display: inline-block;
+  padding: 5px;
+  border-radius: 8px;
+}
+
+.reasoning-head span {
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  text-align: left;
+  margin-left: 5px;
+}
+
+.reasoning-text {
+  background-color: #f2f2f2;
+  color: #016ce0;
+  border-radius: 8px;
+  padding: 0 10px;
+
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.reasoning-text :deep(p){
+  font-size: 0.8em;
+}
+
+.scroll-to-bottom{
+  background-color: rgba(255, 255, 255, 0.8);
+  color: rgba(0, 105, 224, 0.3);
+  position: absolute;
+  bottom: 130px;
+  font-size: 18px;
+  text-align: center;
+  line-height: 2.5;
+  z-index: 10;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 105, 224, 0.3);
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
 
 .input-area {
   padding: 20px 10% 0 10%;

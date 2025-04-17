@@ -8,8 +8,8 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
         dataset: "",
         embdingModel: "",
         platform: "ALIYUN",
-        modelName: "qwen-vl-max-0125",
-        task: ""
+        modelName: "qvq-max-latest",
+        task: "chat"
     }]);
 
     const addConfig = (newConfig) => {
